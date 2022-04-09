@@ -124,12 +124,14 @@ const getUrl = async (req, res) => {
         else {
             const url = await urlModel.findOne({
                 urlCode: urlCode
-            })
+            }).select({ longUrl: 1, urlCode: 1, shortUrl: 1, _id: 0 });
             if (!url) {
                 return res.status(404).send({ status: false, message: "No URL found" })
             }
             else {
-                return res.status(302).redirect(url.longUrl)
+                let seturl=url.longUrl
+                await SET_ASYNC(`${seturl}`, JSON.stringify(url))
+                return res.status(302).redirect(seturl)
             }
         }
     }
