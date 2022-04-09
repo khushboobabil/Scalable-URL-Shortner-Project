@@ -1,10 +1,9 @@
-
 const urlModel = require("../models/urlModels");
 const nanoid = require("nanoid")
 const redis = require("redis");
 const { promisify } = require("util");
 
-//Connect to redis
+//Connection to Redis
 const redisClient = redis.createClient({ host: 'redis-17454.c15.us-east-1-4.ec2.cloud.redislabs.com', port: 17454, username: 'functioup-free-db', password: 'yiIOJJ2luH3yHDzmp0WppDFtuUxn5aqO' });
 
 //Successful connection to redis
@@ -22,14 +21,6 @@ const SET_ASYNC = promisify(redisClient.SET).bind(redisClient);
 const GET_ASYNC = promisify(redisClient.GET).bind(redisClient);
 
 //Validation
-
-// const isValid = function (value) {
-//     if (typeof value == undefined || value == null) return false
-//     if (typeof value === 'string' && value.trim().length === 0) return false
-//     if (typeof value === 'Number' && value.toString().trim().length === 0) return false
-//     return true
-// }
-
 const validUrl = (value) => {
     if (!(/(ftp|http|https|FTP|HTTP|HTTPS):\/\/(\w+:{0,1}\w*@)?(\S+)(:[0-9]+)?(\/|\/([\w#!:.?+=&%@!\-/]))?/.test(value.trim()))) {
         return false
@@ -38,23 +29,27 @@ const validUrl = (value) => {
 }
 
 
-//Converting long URL into Short URL
+//Converting long URL into Short URL.........................................................................
 
 const shortenUrl = async (req, res) => {
     try {
         //our server base code
         const baseUrl = "http://localhost:3000";
 
-        if (Object.entries(req.body).length == 0 || Object.entries(req.body).length > 1) {
-            return res.status(400).send({ status: false, Message: "Invalid Request Params" });
+        // 
+        const query = req.query
+       
+        if (Object.keys(query) != 0) {
+            return res.status(400).send({ status: false, message: "Invalid params present in URL" })
         }
 
-        if (!req.body.hasOwnProperty('longUrl')) {
-            return res.status(400).send({ Status: false, Message: "Wrong Key Present" })
+        const data = req.body
+        if (Object.keys(data) == 0) {
+            return res.status(400).send({ status: false, message: "Please provide URL" })
         }
 
-        const { longUrl } = req.body;
-        //wih The help of Object distucturing we can store the Ojects proporties in a Distinct Variable
+        const { longUrl } = data
+        //wih The help of Object distucturing we can store the Objects proporties in a Distinct Variable
 
         if (!longUrl) {
             return res.status(400).send({ Status: false, Message: "Url Is Required" })
@@ -75,10 +70,10 @@ const shortenUrl = async (req, res) => {
 
         let isUrlExist = await urlModel.findOne({ longUrl }).select({ longUrl: 1, urlCode: 1, shortUrl: 1, _id: 0 });
         if (isUrlExist) {
-            
+
             await SET_ASYNC(`${longUrl}`, JSON.stringify(isUrlExist))
 
-            return res.status(201).send({ status: true, Message: "Success", Data: isUrlExist });
+            return res.status(200).send({ status: true, Message: "Success", Data: isUrlExist });
         }
 
 
@@ -102,7 +97,7 @@ const shortenUrl = async (req, res) => {
         return res.status(201).send({ status: true, Message: "success", Data: finalData });
 
     } catch (error) {
-        res.status(500).send({ status: false, Err: error.message });
+        return res.status(500).send({ status: false, Err: error.message });
     }
 };
 
@@ -112,7 +107,7 @@ module.exports.shortenUrl = shortenUrl;
 
 
 
-//Redirecting short url to long
+//Redirecting short url to long.......................................................................
 
 const getUrl = async (req, res) => {
     try {
@@ -126,25 +121,25 @@ const getUrl = async (req, res) => {
 
         }
 
-        const urlExist = await urlModel.findOne({ urlCode: urlCode });
-
-        if (urlExist) {
-
-            SET_ASYNC(`${urlCode}`, 60 * 60, JSON.stringify(urlExist.longUrl))
-
-            if (urlCode !== urlExist.urlCode) {
-
-                return res.status(404).send({ status: false, Message: "No Url Found, Please Check Url Code", });
+        else {
+            const url = await urlModel.findOne({
+                urlCode: urlCode
+            })
+            if (!url) {
+                return res.status(404).send({ status: false, message: "No URL found" })
             }
-            //let newRedirection=urlExist.longUrl
-            return res.status(302).redirect(urlExist.longUrl);
+            else {
+                return res.status(302).redirect(url.longUrl)
+            }
         }
+    }
 
-    } catch (error) {
-        return res.status(500).send({ status: false, Message: error.message });
+    catch (error) {
+        res.status(500).send({ status: false, Message: error.message });
     }
 };
 
 module.exports.getUrl = getUrl;
+
 
 
